@@ -3,6 +3,7 @@ const express = require("express");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const port = process.env.PORT;
+const unzipper = require('unzipper');
 const fs = require('fs');
 const path = require('path');
 const app = express();
@@ -41,7 +42,7 @@ const predefinedFilePath = path.join(__dirname, 'wordpress.zip');
 
 
 app.post("/api/signup", async (request, response) => {
-    const { email_phone, password, created_at, site_name} = request.body;
+    const { email_phone, password, created_at, site_name, category} = request.body;
     const checkUserQuery = `SELECT * FROM users WHERE email_phone = '${email_phone}';`;
     connection.query(checkUserQuery, async (err, result) => {
         if (err) throw err;
@@ -49,7 +50,7 @@ app.post("/api/signup", async (request, response) => {
             const pattern = /^[^ ]+@[^ ]+\.[a-z]{2,3}$/;
             const sanitizedUserName = site_name.replace(/[^a-zA-Z0-9]/g, '');
             const folderPath = path.join(__dirname, 'users', sanitizedUserName);
-            const destinationPath = path.join(__dirname, "users",sanitizedUserName, 'wordpress.zip');
+            const destinationPath = path.join(__dirname, "users",sanitizedUserName);
 
 
             if (result.length !== 0) {
@@ -75,14 +76,23 @@ app.post("/api/signup", async (request, response) => {
                         response.status(500).send('Internal server error');
                     }
                 });
-                fs.copyFile(predefinedFilePath, destinationPath, (err) => {
-                    if (err) {
-                        console.error('Error copying file:', err);
-                        return res.status(500).send('Internal server error');
-                    }
-            
-                    response.status(200).send('File uploaded successfully');
-                });
+                //fs.copyFile(predefinedFilePath, destinationPath, (err) => {
+                //    if (err) {
+                //        console.error('Error copying file:', err);
+                //        return res.status(500).send('Internal server error');
+                //    }
+                //
+                //    response.status(200).send('File uploaded successfully');
+                //});
+                {category == "wordpress" && fs.createReadStream(predefinedFilePath)
+                .pipe(unzipper.Extract({ path: destinationPath }))
+                .on('close', () => {
+                    response.status(200).send('File unzipped successfully');
+                })
+                .on('error', (err) => {
+                    console.error('Error unzipping file:', err);
+                    response.status(500).send('Internal server error');
+                });}
 
 
                 const hashPassword = await bcrypt.hash(password, 10);
